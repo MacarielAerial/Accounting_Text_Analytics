@@ -1,0 +1,36 @@
+'''
+This script provides answer for Assignment 2 of AM16 SPR20 Financial Reporting Analytiics in London Business School
+The solution is written by Group 7
+'''
+# import libraries
+import os
+from config import Config
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Define exogenous variables
+input_folder_path = 'assignment_2_files/letters/'
+output_folder_path = 'results/'
+
+# Configure the programme
+Config.dir_create(output_folder_path)
+
+class Solve:
+	'''Provides answers for Part B of Assignment 2'''
+	def __init__(self, input_folder_path, output_folder_path):
+		self.input_folder_path = input_folder_path
+		self.output_folder_path = output_folder_path
+
+	def overview(self):
+		print(os.listdir(self.input_folder_path))
+
+	def exec(self):
+		self.overview()
+
+def main():
+	obj = Solve(input_folder_path, output_folder_path)
+	obj.exec()
+
+if __name__ == '__main__':
+	main()
