@@ -1,0 +1,533 @@
+---
+title: "AM16_Financial_Reporting_Analytics_Assignment_2_Group_7"
+author: "Group 7"
+date: "07/03/2020"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+  html_document:
+    highlight: haddock
+    number_sections: yes
+    theme: spacelab
+    toc: yes
+    toc_depth: 2
+    toc_float:
+      collapsed: no
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# Load in required packages
+library(tidyverse)
+library(lubridate)
+library(reticulate)
+use_python('/usr/local/bin/python3')
+```
+
+# Part A
+
+## Question 1
+
+### Read in data
+
+```{r}
+
+# Load in airline Data
+airline_data_raw <- read.delim("assignment_2_files/airline_data.txt", header = TRUE)
+
+```
+
+```{r}
+
+# Overview of data
+glimpse(airline_data_raw)
+
+# Definition of variables in use
+
+# gvkey = Global Company Key - Company Annual Descriptor
+# datadate = Data Date - Company Annual Descriptor
+# fyear = Fiscal Year
+# indfmt = Industry Format
+# consol = Level of Consolidation - Company Annual Descriptor
+# popsrc = Population Source
+# datafmt = Data Format - Company Annual Descriptor
+# tic = Ticker
+# conm = Company Name
+# curcd = Currency
+# aco = Current Assets - Other - Total
+# act = Current Assets - Total
+# aqc = Acquisitions
+# capx = Capital Expenditures
+# ceq = Common/Ordinary Equity - Total
+# che = Cash and Short-Term Investments- Total
+# cogs = Cost of Goods Sold
+# cshfd = Common Shares Used to Calculate EPS Diluted
+# csho = Common Shares Outstanding
+# cshpri = Common Shares Used to Calculate EPS Basic
+# dlc = Debt in Current Liabilities
+# dltt = Long-Term Debt - Total
+# dp = Depreciation and Amortization - Total
+# epsfi = Earnings per Share - Diluted  Including Extraordinary Items
+# epsfx = Earnings per Share - Diluted  Excluding Extraordinary Items
+# gdwlip = Impairment of Goodwill Pretax
+# ib = Income Before Extraordinary Items
+# ibadj = Income Before Extraordinary Items - Adjusted for Common Stock Equivalents
+# invt = Inventories - Total
+# lct = Current Liabilities - Total
+# mib = Minority Interest - Balance Sheet
+# niadj = Net Income (Loss)
+# oiadp = Operating Income After Depreciation
+# oibdp = Operating Income Before Depreciation
+# pstk = Preferred/Preference Stock (Capital) - Total
+# recd = Receivables-Est Doubtful
+# rect = Receivables - Total
+# rectr = Receivables - Trade 
+# sale = Sales/Turnover (Net)
+# seq = Stockholders' Equity - Total
+# txt = Income Taxes - Total
+# wdp = Writedowns Pretax
+# xint = Interest and Related Expense
+# xpp = Prepaid Expenses and Accrued Income
+# xsga = Selling, General and Administrative Expenses
+# exchg = 
+# cik  = 
+# costat =
+# prcc_f = Share price
+# loc = 
+# sic =
+
+```
+
+### Clean Data
+
+```{r}
+
+# Cleaning data
+airline_data <- airline_data_raw %>%
+  rename(date =datadate) %>% 
+  mutate(date = ymd(date))
+
+```
+
+###  Brief Summary of Data
+
+```{r}
+
+# Summary statistics
+summary(airline_data)
+
+```
+
+```{r}
+
+# Number of observations of financial data for a given airline
+per_airline <- airline_data %>% 
+  group_by(tic,conm) %>% 
+  summarise(counted = n())
+print(per_airline)
+
+rm(per_airline)
+```
+
+```{r message=FALSE, warning=FALSE}
+
+# Amount of financial data per year
+per_year <- airline_data %>% 
+  group_by(fyear) %>% 
+  summarise(counted = n())
+
+ggplot(per_year,aes(x=fyear, y=counted))+
+  geom_col()+
+  theme_bw()+
+  labs(title="Amount of financial data from airlines per year",
+       x="Fiscal year",
+       y="Number of airlines")+
+  theme(
+    legend.position= "none"
+  )
+
+rm(per_year)
+```
+
+```{r}
+
+# Different currencies
+currency <- airline_data %>% 
+  group_by(curcd) %>% 
+  summarise(counted = n())
+print(currency)
+
+rm(currency)
+```
+
+```{r}
+
+# Amount of financial data by country
+location <- airline_data %>% 
+  group_by(loc) %>% 
+  summarise(counted = n())
+
+ggplot(location,aes(x=loc, y=counted))+
+  geom_col()+
+  theme_bw()+
+  labs(title="Amount of financial data from airlines per country",
+       x="Country",
+       y="Number of reports")+
+  theme(
+    legend.position= "none"
+  )
+
+rm(location)
+
+```
+
+```{r message=FALSE, warning=FALSE}
+
+# Visualizing the aveage gross margin - top and bottom 5
+
+# Calculate gross margin and average gross margin
+gross_margin <- airline_data %>% 
+  mutate(gross_margin = (sale-cogs)/sale) %>% 
+  group_by(tic) %>% 
+  summarise(average_gross_margin = mean(gross_margin))
+
+# Select top 5
+top_gross_margin <- gross_margin %>%
+  top_n(5, average_gross_margin) %>% 
+  mutate(top=1)
+
+# Select bottom 5
+bottom_gross_margin <- gross_margin %>%
+  filter(average_gross_margin > -999) %>% 
+  top_n(5, -average_gross_margin) %>% 
+  mutate(top = 0)
+
+# Combine the two
+top_bottom_gross_margrin <- rbind(top_gross_margin,bottom_gross_margin)
+
+# Plot
+ggplot(top_bottom_gross_margrin,aes(x=reorder(tic, -average_gross_margin), y=average_gross_margin))+
+  geom_col(aes(fill=top))+
+  theme_bw()+
+  labs(title="Average Gross Margins of Airlines",
+       subtitle="Top 5 and Bottom 5",
+       x="Company",
+       y="Average Gross Margin") +
+  theme(
+    legend.position= "none"
+  )
+
+rm(gross_margin,top_gross_margin,bottom_gross_margin,top_bottom_gross_margrin)
+
+```
+
+```{r message=FALSE, warning=FALSE}
+
+# Industry revenues by year
+airline_data %>% 
+  drop_na(sale) %>% 
+  group_by(fyear) %>% 
+  summarise(yearly_revenue = mean(sale)) %>% 
+
+ggplot(aes(x=fyear, y=yearly_revenue))+
+  geom_col()+
+  theme_bw()+
+  labs(title="Airline Industry Revenues Over Time",
+       subtitle = "1999 to 2019",
+       x="Fiscal year",
+       y="Revenues")+
+  theme(
+    legend.position= "none"
+  )
+
+```
+
+## Question 2
+
+### Select a Firm
+
+```{r}
+#Chose Ryanair as Target Firm
+
+#Ryanair Revenues
+ryanair <- airline_data %>% 
+  drop_na(sale) %>% 
+  group_by(tic,conm, fyear) %>% 
+  filter(tic == "RYAAY")
+
+  
+ggplot(ryanair, aes(x=fyear, y=sale))+
+  geom_col()+
+  theme_bw()+
+  labs(title="Ryanair Revenues Over Time",
+       subtitle = "1999 to 2019",
+       x="Fiscal year",
+       y="Revenues")+
+  theme(
+    legend.position= "none"
+  )
+
+```
+
+
+## Question 3
+
+### Operating performance
+
+```{r}
+
+# EBITDA margin = EBITDA/sales
+# oibdp = Operating Income Before Depreciation (EBITDA)
+airline_data <- airline_data %>%
+  mutate(EBITDA_margin = oibdp/sale)
+
+
+```
+
+### Credit / Liquidity
+
+```{r}
+
+# quick ratio = (Current assets - inventories - prepaid assets)/current liabilities
+
+airline_data <- airline_data %>%
+  mutate(quick_ratio = (act- invt - xpp)/lct)
+
+```
+
+### EV_to_EBITDA
+
+```{r}
+
+# Enterprise value = equity value + debt + preferred stock + noncontrolling interest - cash
+# equity value = share price × fully diluted shares outstanding
+# cash not available in the data set - we used che instead, because it represents cash + short-term investments
+
+airline_data <- airline_data %>%
+  mutate(EV_to_EBITDA = ((prcc_f*csho) + (dlc + dltt) + mib + pstk - che)/oibdp)
+
+```
+
+## Question 4 
+```{r}
+
+# Based on the sector, size, and air routes, we decided to target the main airline players in Europe that frequently compete against each other on similar routes. After thorough research, we choose Air France, international airlines(operating mainly in Madrid, Spain), Lufthansa as the main competitors of Ryanair that were available in our data
+
+# DLAKY - Deutsche Lufthansa AG
+# AFLYY - AIR FRANCE
+# RYAAY - RYANAIR HOLDINGS PLC
+# ICAGY - INTL CONSOL AIRLINES GROUP
+
+# we need to run it again since the airline_data has three new variables
+
+comparables_data <- airline_data %>% 
+  filter(tic %in% c("DLAKY", # 2001-2018
+                 "AFLYY", # 2002-2018
+                 "RYAAY", # 1999-2019
+                 "ICAGY")) # 1999-2019
+
+```
+
+## EBITDA margin Comparison
+```{r}
+
+ggplot(comparables_data,aes(x=fyear,y=EBITDA_margin,colour=tic)) +
+  geom_line() +
+  theme_bw()+
+  ggtitle("EBITDA margin for four major European airlines") +
+  xlab("Year") + ylab("EBITDA Margin")+
+  theme(legend.position="bottom")
+
+```
+
+## Quick ratio Comparison
+```{r}
+
+ggplot(comparables_data,aes(x=fyear,y=quick_ratio,colour=tic)) +
+  geom_line() +
+  theme_bw()+
+  ggtitle("Quick ratio for four major European airlines") +
+  xlab("Year") + ylab("Quick Ratio")+
+  theme(legend.position="bottom")
+
+```
+
+## EV_to_EBITDA Comparison
+```{r message=FALSE, warning=FALSE}
+
+ggplot(comparables_data,aes(x=fyear,y=EV_to_EBITDA,colour=tic)) +
+  geom_line() +
+  theme_bw()+
+  ggtitle("EV_to_EBITDA for four major European airlines") +
+  xlab("Year") + ylab("EV_to_EBITDA")+
+  theme(legend.position="bottom")
+
+```
+
+## Question 5
+
+See Report
+
+# Part B
+
+```{python}
+# import libraries
+import os
+import re
+import numpy as np
+import pandas as pd
+import nltk
+from nltk.corpus import stopwords
+import matplotlib.pyplot as plt
+from pandas.plotting import register_matplotlib_converters
+import datetime
+from datetime import date
+from wordcloud import WordCloud, STOPWORDS
+from collections import Counter
+
+# Define exogenous variables
+input_folder_path = 'assignment_2_files/letters/'
+add_input_path = 'additional_input/cik_ticker.csv'
+output_folder_path = 'results/'
+
+# Configure the programme
+if not os.path.exists(output_folder_path):
+	os.makedirs(output_folder_path)
+register_matplotlib_converters()
+```
+
+```{python}
+class Solve:
+	'''Provides answers for Part B of Assignment 2'''
+	def __init__(self, input_folder_path, add_input_path, output_folder_path):
+		self.input_folder_path = input_folder_path
+		self.df_ticker = pd.read_csv(add_input_path, sep = '|') # Load ticker and cik match info
+		self.output_folder_path = output_folder_path
+		self.letter_name_list = os.listdir(self.input_folder_path) # List all file names in a folder
+		self.letter_name_list.remove('.DS_Store') # Remove the system file
+		self.type_list = []
+		self.date_trans_list = []
+		self.cik_list = []
+		self.df = pd.DataFrame()
+		self.df_consolidated = pd.DataFrame()
+		self.df_freq_firm_raw = pd.DataFrame()
+		self.df_freq_firm = pd.DataFrame()
+		self.files_dict = {}
+		self.files_concat = ''
+		self.wordcloud_input = None
+		self.wc = None
+		self.filtered_text_pre = None
+		self.filtered_text = None
+
+	def read_files(self):
+		for filename in self.letter_name_list:
+			with open(self.input_folder_path + filename, 'r') as file:
+				self.files_dict[filename] = file.read()
+				self.files_concat = self.files_concat + ' ' + self.files_dict[filename]
+
+	def text_analytics(self):
+		exclusion = set(stopwords.words('english'))
+		mannual_exclusion = set(stopwords.words('english') + ['31', 'comments', 'company', 'please', 'form', 'page', 'disclosure', 'financial', 'inc.', 'year', 'ended', 'mr.', 'also', 'no.', '2', 'accounting', 'note', 'may', 'us', 'staff', 'december', 'response', 'related', 'aircraft'])
+		self.filtered_text_pre = [i for i in self.files_concat.split() if i.lower() not in exclusion]
+		self.filtered_text = [i for i in self.files_concat.split() if i.lower() not in mannual_exclusion]
+		self.wordcloud_input = dict(Counter(self.filtered_text).most_common(100))
+		self.wc = WordCloud(background_color="white",width=2000,height=1500, max_words=50,relative_scaling=0.5,normalize_plurals=False).generate_from_frequencies(self.wordcloud_input)
+		plt.figure(figsize = (16, 9))
+		plt.imsave(fname = self.output_folder_path + 'Word_Cloud.jpeg', arr = self.wc, dpi = 300)
+		plt.close()
+		D = dict(Counter(self.filtered_text_pre).most_common(50))
+		plt.figure(figsize=(25,10))
+		plt.bar(range(len(D)), list(D.values()), align='center')
+		plt.xticks(range(len(D)), list(D.keys()))
+		plt.xticks(rotation=45)
+		plt.xlabel('Words')
+		plt.title('Words frequency')
+		plt.ylabel('frequency')
+		plt.savefig(self.output_folder_path + 'Word_Frequency.png', dpi = 300)
+		plt.close()
+
+	def overview(self):
+		'''Obtains a list of letter types and transmission dates and stores in a dataframe'''
+		# Extract letter types and transmission dates out of file names
+		for letter_name in self.letter_name_list:
+			self.type_list.append(
+				''.join(re.findall('[a-zA-Z]+', letter_name)).rstrip('txt')
+				)
+			match = re.search(r'\d{4}-\d{2}-\d{2}', letter_name)
+			self.date_trans_list.append(
+				datetime.datetime.strptime(match.group(), '%Y-%m-%d').date().strftime('%Y-%m-%d')
+				)
+		print('First three letter types:\n' + str(self.type_list[0:3]))
+		print('First three transmission dates:\n' + str(self.date_trans_list[0:3]))
+		# Store the extracted info in a dataframe
+		self.df['letter_type'], self.df['date_trans'] = self.type_list, pd.to_datetime(self.date_trans_list)
+
+	def ticker_add(self):
+		'''Extracts CIK numbers from file names and joins them with ticker information'''
+		# Obtain a list of cik numbers for each letter
+		[self.cik_list.append(letter_name[0:10].lstrip('0000')) for letter_name in self.letter_name_list]
+		# Add cik number as a column to the consolidated dataframe
+		self.df['cik'] = pd.Series(self.cik_list)
+		# Join the ticker column with the consolidated dataframe after unifying column names
+		self.df_ticker.rename(columns = {'CIK': 'cik'}, inplace = True)
+		self.df_ticker = self.df_ticker[['cik', 'Name', 'Business']]
+		self.df['cik'] = self.df['cik'].astype('int64')
+		self.df_consolidated = self.df.join(self.df_ticker.set_index('cik'), on = 'cik')
+		self.df_consolidated.reset_index(inplace = True)
+		self.df_consolidated.drop(['index'], inplace = True, axis = 1)
+		# Sort dataframes based on time of letters communicated
+		self.df.sort_values(by = ['date_trans'], inplace = True)
+
+	def analysis(self):
+		self.df_freq_firm_raw = pd.DataFrame(self.df_consolidated['Name'].value_counts())
+		self.df_freq_firm = self.df_freq_firm_raw.reset_index().rename(columns = {'index': 'Name', 'Name': 'Frequency'})
+
+	def data_export(self):
+		# Produce a histogram of communication date frequency
+		plt.figure(figsize = (16, 9))
+		self.df_consolidated['date_trans'].hist(bins = 30)
+		plt.title('Total Number of Letters Exchange over Time')
+		plt.ylabel('Total Number of Letters)')
+		plt.xlabel('First Transmission Date')
+		plt.savefig(self.output_folder_path + 'Number_of_Letters_over_Time.png', dpi = 300)
+		plt.close()
+		# Save the extracted structured dataframe to disc
+		self.df_consolidated.to_csv(output_folder_path + 'structured_data.csv', index = False)
+
+	def data_export_2(self):
+		# Produce a frequency chart for the number of letters each firm receives
+		plt.figure(figsize = (16, 9))
+		self.df_freq_firm_raw.plot(kind = 'barh', figsize = (20,9))
+		plt.savefig(self.output_folder_path + 'Frequency_Chart_Firm.jpeg', dpi = 300)
+		plt.close()	
+
+	def data_export_3(self):
+		plt.figure(figsize = (16, 9))
+		self.df_consolidated.loc[self.df_consolidated['cik'] == 27904, 'date_trans'].hist(bins = 30)
+		plt.savefig(self.output_folder_path + 'Letter_Number_Delta.jpeg', dpi = 300)
+		plt.close()
+
+	def exec(self):
+		self.read_files()
+		self.text_analytics()
+		self.overview()
+		self.ticker_add()
+		self.ticker_add()
+		self.analysis()
+		self.data_export()
+		self.data_export_2()
+		self.data_export_3()
+		print('First 10 rows of the consolidated dataframe:')
+		print(self.df_consolidated)
+		print('Frequency table of letters communicated based on firms:')
+		print(self.df_freq_firm)
+```
+
+```{python}
+# Execution code
+obj = Solve(input_folder_path, add_input_path, output_folder_path)
+obj.exec()
+```
+
+
