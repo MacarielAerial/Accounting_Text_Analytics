@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 import datetime
 from datetime import date
-import wordcloud
+from wordcloud import WordCloud, STOPWORDS
+from collections import Counter
 
 # Define exogenous variables
 input_folder_path = 'assignment_2_files/letters/'
@@ -36,13 +37,16 @@ class Solve:
 		self.cik_list = []
 		self.df = pd.DataFrame()
 		self.df_consolidated = pd.DataFrame()
+		self.df_freq_firm_raw = pd.DataFrame()
 		self.df_freq_firm = pd.DataFrame()
 		self.files_dict = {}
+		self.files_concat = ''
 
 	def read_files(self):
 		for filename in self.letter_name_list:
 			with open(self.input_folder_path + filename, 'r') as file:
 				self.files_dict[filename] = file.read()
+				self.files_concat = self.files_concat + ' ' + self.files_dict[filename]
 
 	def overview(self):
 		'''Obtains a list of letter types and transmission dates and stores in a dataframe'''
@@ -71,11 +75,14 @@ class Solve:
 		self.df_ticker = self.df_ticker[['cik', 'Name', 'Business']]
 		self.df['cik'] = self.df['cik'].astype('int64')
 		self.df_consolidated = self.df.join(self.df_ticker.set_index('cik'), on = 'cik')
+		self.df_consolidated.reset_index(inplace = True)
+		self.df_consolidated.drop(['index'], inplace = True, axis = 1)
 		# Sort dataframes based on time of letters communicated
 		self.df.sort_values(by = ['date_trans'], inplace = True)
 
 	def analysis(self):
-		self.df_freq_firm = self.df_consolidated['Name'].value_counts()
+		self.df_freq_firm_raw = pd.DataFrame(self.df_consolidated['Name'].value_counts())
+		self.df_freq_firm = self.df_freq_firm_raw.reset_index().rename(columns = {'index': 'Name', 'Name': 'Frequency'})
 
 	def data_export(self):
 		# Produce a histogram of communication date frequency
@@ -86,12 +93,21 @@ class Solve:
 		plt.xlabel('First Transmission Date')
 		plt.savefig(self.output_folder_path + 'Number_of_Letters_over_Time.png', dpi = 300)
 		plt.close()
-		plt.figure(figsize = (16, 9))
-		self.df_freq_firm.plot(kind = 'barh')
-		plt.savefig(self.output_folder_path + 'Frequency_Chart_Firms.png', dpi = 300)
-		plt.close()
 		# Save the extracted structured dataframe to disc
 		self.df_consolidated.to_csv(output_folder_path + 'structured_data.csv', index = False)
+
+	def data_export_2(self):
+		# Produce a frequency chart for the number of letters each firm receives
+		plt.figure(figsize = (16, 9))
+		self.df_freq_firm_raw.plot(kind = 'barh', figsize = (20,9))
+		plt.savefig(self.output_folder_path + 'Frequency_Chart_Firm.jpeg', dpi = 300)
+		plt.close()	
+
+	def data_export_3(self):
+		plt.figure(figsize = (16, 9))
+		self.df_consolidated.loc[self.df_consolidated['cik'] == '27904', 'date_trans'].hist(bins = 30)
+		plt.savefig(self.output_folder_path + 'Letter_Number_Delta.jpeg', dpi = 300)
+		plt.close()
 
 	def exec(self):
 		self.read_files()
@@ -100,10 +116,13 @@ class Solve:
 		self.ticker_add()
 		self.analysis()
 		self.data_export()
+		self.data_export_2()
+		self.data_export_3()
 		print('First 10 rows of the consolidated dataframe:')
 		print(self.df_consolidated)
 		print('Frequency table of letters communicated based on firms:')
 		print(self.df_freq_firm)
+		print(self.df_consolidated.loc[self.df_consolidated['cik'] == '27904', 'date_trans'])
 
 def main():
 	obj = Solve(input_folder_path, add_input_path, output_folder_path)
