@@ -8,6 +8,8 @@ import re
 from config import Config
 import numpy as np
 import pandas as pd
+import nltk
+from nltk.corpus import stopwords
 import matplotlib.pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 import datetime
@@ -41,12 +43,37 @@ class Solve:
 		self.df_freq_firm = pd.DataFrame()
 		self.files_dict = {}
 		self.files_concat = ''
+		self.wordcloud_input = None
+		self.wc = None
+		self.filtered_text_pre = None
+		self.filtered_text = None
 
 	def read_files(self):
 		for filename in self.letter_name_list:
 			with open(self.input_folder_path + filename, 'r') as file:
 				self.files_dict[filename] = file.read()
 				self.files_concat = self.files_concat + ' ' + self.files_dict[filename]
+
+	def text_analytics(self):
+		exclusion = set(stopwords.words('english'))
+		mannual_exclusion = set(stopwords.words('english') + ['31', 'comments', 'company', 'please', 'form', 'page', 'disclosure', 'financial', 'inc.', 'year', 'ended', 'mr.', 'also', 'no.', '2', 'accounting', 'note', 'may', 'us', 'staff', 'december', 'response', 'related', 'aircraft'])
+		self.filtered_text_pre = [i for i in self.files_concat.split() if i.lower() not in exclusion]
+		self.filtered_text = [i for i in self.files_concat.split() if i.lower() not in mannual_exclusion]
+		self.wordcloud_input = dict(Counter(self.filtered_text).most_common(100))
+		self.wc = WordCloud(background_color="white",width=2000,height=1500, max_words=50,relative_scaling=0.5,normalize_plurals=False).generate_from_frequencies(self.wordcloud_input)
+		plt.figure(figsize = (16, 9))
+		plt.imsave(fname = self.output_folder_path + 'Word_Cloud.jpeg', arr = self.wc, dpi = 300)
+		plt.close()
+		D = dict(Counter(self.filtered_text_pre).most_common(50))
+		plt.figure(figsize=(25,10))
+		plt.bar(range(len(D)), list(D.values()), align='center')
+		plt.xticks(range(len(D)), list(D.keys()))
+		plt.xticks(rotation=45)
+		plt.xlabel('Words')
+		plt.title('Words frequency')
+		plt.ylabel('frequency')
+		plt.savefig(self.output_folder_path + 'Word_Frequency.png', dpi = 300)
+		plt.close()
 
 	def overview(self):
 		'''Obtains a list of letter types and transmission dates and stores in a dataframe'''
@@ -105,12 +132,13 @@ class Solve:
 
 	def data_export_3(self):
 		plt.figure(figsize = (16, 9))
-		self.df_consolidated.loc[self.df_consolidated['cik'] == '27904', 'date_trans'].hist(bins = 30)
+		self.df_consolidated.loc[self.df_consolidated['cik'] == 27904, 'date_trans'].hist(bins = 30)
 		plt.savefig(self.output_folder_path + 'Letter_Number_Delta.jpeg', dpi = 300)
 		plt.close()
 
 	def exec(self):
 		self.read_files()
+		self.text_analytics()
 		self.overview()
 		self.ticker_add()
 		self.ticker_add()
@@ -122,7 +150,6 @@ class Solve:
 		print(self.df_consolidated)
 		print('Frequency table of letters communicated based on firms:')
 		print(self.df_freq_firm)
-		print(self.df_consolidated.loc[self.df_consolidated['cik'] == '27904', 'date_trans'])
 
 def main():
 	obj = Solve(input_folder_path, add_input_path, output_folder_path)
